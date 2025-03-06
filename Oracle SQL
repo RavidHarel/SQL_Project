@@ -1,0 +1,111 @@
+------------SQL-Portfolio------------
+
+------------SQL Oracle – PLSQL------------
+
+------------Querry Number 1 – Check Correct Emails:
+
+CREATE TABLE Check_Correct_email AS
+WITH "CTE" AS
+(
+SELECT DISTINCT
+       email_table.id,
+       email_table.email,
+        -- בודק אם המייל מכיל את אחד הסימנים האלה
+      CASE  WHEN REGEXP_LIKE(email_table.email,'[][}{#%^*+=!?+<>$"&_]')
+            -- בודק אם המייל מכיל מספרים בלבד
+            OR REGEXP_LIKE( email_table.email, '^\d{0,6}\.{0,1}\d{0,6}$')
+             -- בודק אם המייל מכיל תווים בעברית
+            OR REGEXP_LIKE(email_table.email,'[א-ת]')
+            -- בודק אם המייל מסתיים או מתחיל באחד מהתווים הבאים
+            OR email_table.email LIKE '@%'
+            OR email_table.email LIKE '%@@%'
+            OR email_table.email LIKE '%con'
+            OR email_table.email LIKE '%i'
+            OR email_table.email LIKE '%ci.il'
+            OR email_table.email LIKE '%.'
+            OR email_table.email LIKE '%-'
+            OR email_table.email LIKE '%;%'
+            OR email_table.email LIKE '%fnx.co.il%'
+            OR email_table.email NOT LIKE '%@%'
+            OR email_table.email NOT LIKE '%.%'
+            OR email_table.email LIKE '%ill'
+            --בודק אם האות האחרונה במייל מסתיימת במספר כלשהו
+            OR SUBSTR(email_table.email, LENGTH(email_table.email)) IN ('0','1','2','3','4','5','6','7','8','9')
+            then 'Wrong Email'
+            else 'Correct Email' END AS CheckEmails
+
+FROM EmailTable email_table
+WHERE 1=1
+      AND email_table.email IS NOT NULL     
+)
+SELECT  DISTINCT
+ cte.id,
+ COUNT(cte.email) OVER (PARTITION BY cte.id AS CountEmails,
+ LISTAGG(cte.email, ';') WITHIN GROUP (ORDER BY cte.email) 
+OVER(PARTITION BY cte.id) AS email
+FROM "CTE" cte
+WHERE 1=1
+     AND CheckEmails = 'Correct Email'
+ 
+;
+
+
+
+
+
+
+------------Querry Number 2 – Make Pivot Table By Years:
+
+SELECT *
+FROM
+(
+SELECT salary.date,  salary.id, salary.ID_Name, salary.Company_Name, salary.Salary_Year, salary.Sum_Salary
+FROM Salary_Table salary
+) salary_table_2
+PIVOT (
+      SUM(Sum_Salary) FOR Salary_Year
+      IN
+      (2026,2025,2024,2023,2022,2021,2020,2019,2018,2017,2016,2015,2014,
+       2013,2012,2011,2010,2009,2008,2007,2006,2005,2004,2003,
+       2002,2001,2000,1999,1998,1997,1996,1995,1994,1993,1992,1991,1990)
+      )
+WHERE 1=1
+      AND date  =
+      (
+      SELECT MAX(salary_table_3.date )
+      FROM Salary_Table salary_table_3
+      )
+      ;
+ 
+ 
+ 
+------------Querry Number 3 – Checking the salary for the past three months:
+
+--------------- שימוש בפונקציית CTE
+WITH "Ranked_Dates" AS
+(
+SELECT
+-------- המרה של תאריך נכונות
+to_char(salary.date ,'yyyymmdd') AS date,
+salary.Company_Name,
+salary.id,
+salary.SumSalary,
+-------- שימוש בפונקציית חלון כדי להביא את השכר של החודש הקודם
+LAG(salary. SumSalary) OVER (PARTITION BY salary.id,salary.Company_Name 
+ORDER BY salary.date ) AS Prev_Month_Salary,
+-------- שימוש בפונקציית חלון כדי להביא השכר של החודשיים הקודמים
+LAG(salary.Salary,2) OVER (PARTITION BY salary.Company_Name,salary.id 
+ORDER BY salary.date ) AS Prev_2_Months_Salary,
+-------- שימוש בראנק כדי לדרג את התאריכים
+RANK() OVER (PARTITION BY salary.id, salary.Company_Name 
+ORDER BY salary.date ) AS rnk
+FROM Salary_Table salary
+WHERE 1=1
+      AND salary.Company_Name = 'XBR'
+)
+SELECT *
+FROM  "Ranked_Dates"
+--------- להביא את תאריך הנכונות האחרון
+WHERE date = (SELECT MAX(Ranked.date) FROM "Ranked_Dates" Ranked)
+ORDER BY id
+;
